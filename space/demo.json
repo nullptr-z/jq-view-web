@@ -1,0 +1,329 @@
+{
+  "code": 0,
+  "message": "",
+  "data": {
+    "myrank": {
+      "user_id": 10000002304,
+      "username": "auto_test_182",
+      "iconurl": "https://static-test.hihi.com/avatars/202501/02/ebeeb656a92b2e7fa454dca62a1d5028151951.jpg",
+      "rank": 1,
+      "score": 6091425,
+      "room": {
+        "room_id": 869047591,
+        "catalog_id": 148,
+        "name": "auto_test_182的空间~",
+        "announcement": "111",
+        "creator_id": 10000002304,
+        "creator_username": "auto_test_182",
+        "statistics": {
+          "revenue": 47868807,
+          "accumulation": 2574,
+          "online": 0,
+          "attention": false,
+          "attention_count": 0,
+          "vip": 0,
+          "score": 58889
+        },
+        "status": {
+          "open": 1,
+          "open_mode": 0,
+          "nue": 425000,
+          "open_time": 1764922718527,
+          "amrak": "6932955e5c9c06001409ff12",
+          "close_time": null,
+          "channel": {
+            "type": "channel",
+            "event": "start",
+            "platform": "ios",
+            "time": 1765458320884
+          },
+          "broadcasting": false,
+          "attention": false
+        },
+        "cover_url": "https://static-test.hihi.com/avatars/icon01.png",
+        "creator_iconurl": "https://static-test.hihi.com/avatars/202501/02/ebeeb656a92b2e7fa454dca62a1d5028151951.jpg",
+        "activity_catalog_id": 148
+      },
+      "uuo": {
+        "season": {
+          "order": {
+            "order_name": "大师 5 星",
+            "order": 6,
+            "sub_order": 5,
+            "order_icon_url": "https://static-test.hihi.com/live/uuo/order/6.png",
+            "order_score": 6091425
+          }
+        }
+      }
+    },
+    "data": [
+      {
+        "user_id": 14241084,
+        "username": "燕ziii",
+        "iconurl": "https://static-test.hihi.com/avatars/202404/25/85a142b45a5d4a87806072924a37695b183725.jpg",
+        "rank": 1,
+        "score": 794670,
+        "room": {
+          "room_id": 441179085,
+          "catalog_id": 140,
+          "name": "燕ziii 的空间",
+          "announcement": "欢迎来到 燕ziii 的空间!\r\n啊\r\n啊\r\n啊\r\n啊\r\n啊\r\n啊\r\n。\r\n。\r\n。\r\n。\r\n。",
+          "creator_id": 14241084,
+          "creator_username": "燕ziii",
+          "statistics": {
+            "revenue": 15916982188,
+            "accumulation": 20,
+            "online": 0,
+            "attention": false,
+            "attention_count": 0,
+            "vip": 0,
+            "score": 110
+          },
+          "status": {
+            "open": 1,
+            "open_mode": 0,
+            "nue": 15893026052,
+            "open_time": 1769079246689,
+            "amrak": "697201ced947b700119cfd28",
+            "close_time": null,
+            "channel": {
+              "type": "open",
+              "time": 1767860895620
+            },
+            "broadcasting": false,
+            "attention": false
+          },
+          "cover_url": "https://static-test.hihi.com/fmcovers/202409/06/8e29101d04751e702a4739b6450b55e5.jpg",
+          "creator_iconurl": "https://static-test.hihi.com/avatars/202404/25/85a142b45a5d4a87806072924a37695b183725.jpg",
+          "creator_introduction": "找茬的 ＼＼\\\\( 'ω' ) //／／测试测试测试 (❀｣╹□╹)｣*･ 啦啦啦",
+          "activity_catalog_id": 115
+        },
+        "uuo": {
+          "season": {
+            "order": {
+              "order_name": "大师 2 星",
+              "order": 6,
+              "sub_order": 2,
+              "order_icon_url": "https://static-test.hihi.com/live/uuo/order/6.png",
+              "order_score": 794670
+            }
+          }
+        }
+      },
+      {
+        "user_id": 9075375,
+        "username": "9075375",
+        "iconurl": "https://static-test.hihi.com/avatars/202511/15/34494713f2822ec7259d70573c2c6f60214016.png",
+        "rank": 2,
+        "score": 785173,
+        "room": {
+          "room_id": 9075375,
+          "catalog_id": 141,
+          "name": "9075375 的空间~",
+          "announcement": "欢迎来到 9075375 的空间!\n本次看看的主题是*\u0026#¥(难以描述)... \n希望大家偷偷喜欢我，默默关注我(ゝ∀・)!",
+          "creator_id": 9075375,
+          "creator_username": "9075375",
+          "statistics": {
+            "revenue": 26719229,
+            "accumulation": 1243,
+            "online": 0,
+            "attention": false,
+            "attention_count": 0,
+            "vip": 0,
+            "score": 280
+          },
+          "status": {
+            "open": 1,
+            "open_mode": 0,
+            "nue": 21472574,
+            "open_time": 1763609589617,
+            "amrak": "691e8bf55c9c060014e33237",
+            "close_time": null,
+            "channel": {
+              "type": "open",
+              "time": 1764140937104
+            },
+            "broadcasting": false,
+            "attention": false
+          },
+          "cover_url": "https://static-test.hihi.com/avatars/icon01.png",
+          "creator_iconurl": "https://static-test.hihi.com/avatars/202511/15/34494713f2822ec7259d70573c2c6f60214016.png",
+          "activity_catalog_id": 105
+        },
+        "uuo": {
+          "season": {
+            "order": {
+              "order_name": "大师 2 星",
+              "order": 6,
+              "sub_order": 2,
+              "order_icon_url": "https://static-test.hihi.com/live/uuo/order/6.png",
+              "order_score": 785173
+            }
+          }
+        }
+      },
+      {
+        "user_id": 10000000516,
+        "username": "乔治",
+        "iconurl": "https://static-test.hihi.com/avatars/icon01.png",
+        "rank": 3,
+        "score": 759092,
+        "room": {
+          "room_id": 817923543,
+          "catalog_id": 142,
+          "name": "乔治的空间",
+          "announcement": "测试简介长度测试简介长度测试简介长度测试简介长度测试简介长度测试简介长度测试简介长度测试简介长度测试简介长度测试简介长度测试简介长度测试简介长度测试简介长度测试简介长度测试简介长度测试简介长度测试简介长度测试简介长度测试简介长度测试简介长度测试简介长度测试简介长度测试简介长度测试简介长度测试简介长度",
+          "creator_id": 10000000516,
+          "creator_username": "乔治",
+          "statistics": {
+            "revenue": 802539646,
+            "accumulation": 7,
+            "online": 0,
+            "attention": false,
+            "attention_count": 0,
+            "vip": 0,
+            "score": 338
+          },
+          "status": {
+            "open": 1,
+            "open_mode": 0,
+            "nue": 802493052,
+            "open_time": 1769497181619,
+            "amrak": "6978625dd947b70011acd607",
+            "close_time": null,
+            "channel": {
+              "type": "open",
+              "time": 1768996498550
+            },
+            "broadcasting": false,
+            "attention": false
+          },
+          "cover_url": "https://static-test.hihi.com/avatars/icon01.png",
+          "creator_iconurl": "https://static-test.hihi.com/avatars/icon01.png",
+          "activity_catalog_id": 142
+        },
+        "uuo": {
+          "season": {
+            "order": {
+              "order_name": "大师 2 星",
+              "order": 6,
+              "sub_order": 2,
+              "order_icon_url": "https://static-test.hihi.com/live/uuo/order/6.png",
+              "order_score": 759092
+            }
+          }
+        }
+      },
+      {
+        "user_id": 9075164,
+        "username": "9075164啊啊啊啊啊啊",
+        "iconurl": "https://static-test.hihi.com/avatars/202411/20/bdf86e49987d8e8df0a666669bea2957145018.jpg",
+        "rank": 4,
+        "score": 747398,
+        "room": {
+          "room_id": 9075164,
+          "catalog_id": 144,
+          "name": "9075164 的空间~",
+          "announcement": "欢迎来到 9075164 的空间!\n本次看看的主题是*\u0026#¥(难以描述)... \n希望大家偷偷喜欢我，默默关注我(ゝ∀・)!",
+          "creator_id": 9075164,
+          "creator_username": "9075164啊啊啊啊啊啊",
+          "statistics": {
+            "revenue": 17779736,
+            "accumulation": 117,
+            "online": 0,
+            "attention": false,
+            "attention_count": 0,
+            "vip": 0,
+            "score": 93320
+          },
+          "status": {
+            "open": 1,
+            "open_mode": 0,
+            "nue": 16306989,
+            "open_time": 1764657381458,
+            "amrak": "692e88e55c9c060014017820",
+            "close_time": null,
+            "channel": {
+              "type": "open",
+              "time": 1769509180669
+            },
+            "broadcasting": false,
+            "attention": false
+          },
+          "cover_url": "https://static-test.hihi.com/avatars/icon01.png",
+          "creator_iconurl": "https://static-test.hihi.com/avatars/202411/20/bdf86e49987d8e8df0a666669bea2957145018.jpg",
+          "activity_catalog_id": 122
+        },
+        "uuo": {
+          "season": {
+            "order": {
+              "order_name": "大师 2 星",
+              "order": 6,
+              "sub_order": 2,
+              "order_icon_url": "https://static-test.hihi.com/live/uuo/order/6.png",
+              "order_score": 747398
+            }
+          }
+        }
+      },
+      {
+        "user_id": 2939325,
+        "username": "橘猫的袋",
+        "iconurl": "https://static-test.hihi.com/avatars/202102/11/1bfa6433da17ebd9fc7d2f72556b0375165115.png",
+        "rank": 5,
+        "score": 585871,
+        "room": {
+          "room_id": 10652247,
+          "catalog_id": 145,
+          "name": "橘猫的袋的空间~",
+          "announcement": "241324",
+          "creator_id": 2939325,
+          "creator_username": "橘猫的袋",
+          "statistics": {
+            "revenue": 29056648,
+            "accumulation": 0,
+            "online": 0,
+            "attention": false,
+            "attention_count": 0,
+            "vip": 0,
+            "score": 0
+          },
+          "status": {
+            "open": 0,
+            "open_mode": 0,
+            "nue": 2211232,
+            "open_time": 1769415674370,
+            "close_time": 1769424223049,
+            "channel": {
+              "type": "open",
+              "time": 1769418761239
+            },
+            "broadcasting": false,
+            "attention": false
+          },
+          "cover_url": "https://static-test.hihi.com/avatars/icon01.png",
+          "creator_iconurl": "https://static-test.hihi.com/avatars/202102/11/1bfa6433da17ebd9fc7d2f72556b0375165115.png",
+          "creator_introduction": "家大业大",
+          "activity_catalog_id": 159
+        },
+        "uuo": {
+          "season": {
+            "order": {
+              "order_name": "大师 1 星",
+              "order": 6,
+              "sub_order": 1,
+              "order_icon_url": "https://static-test.hihi.com/live/uuo/order/6.png",
+              "order_score": 585871
+            }
+          }
+        }
+      }
+    ],
+    "pagination": {
+      "count": 9,
+      "maxpage": 2,
+      "p": 1,
+      "pagesize": 5
+    }
+  }
+}

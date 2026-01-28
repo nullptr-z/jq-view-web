@@ -1,0 +1,672 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>jq-view</title>
+  <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap');
+
+    :root {
+      --bg: #f8fafc;
+      --bg-card: #ffffff;
+      --bg-hover: #f1f5f9;
+      --bg-selected: #dbeafe;
+      --border: #e2e8f0;
+      --text: #1e293b;
+      --text-secondary: #64748b;
+      --text-muted: #94a3b8;
+      --accent: #3b82f6;
+      --accent-green: #16a34a;
+      --accent-orange: #ea580c;
+      --accent-purple: #7c3aed;
+      --accent-red: #dc2626;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'IBM Plex Sans', -apple-system, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+    }
+
+    .app {
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+    }
+
+    /* Header */
+    .header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 20px;
+      background: var(--bg-card);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-weight: 600;
+      font-size: 15px;
+    }
+
+    .brand-icon {
+      background: linear-gradient(135deg, var(--accent), var(--accent-purple));
+      width: 28px;
+      height: 28px;
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+      font-weight: 700;
+      color: #fff;
+    }
+
+    .actions {
+      display: flex;
+      gap: 8px;
+    }
+
+    .btn {
+      background: var(--bg-hover);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 6px 12px;
+      border-radius: 6px;
+      font-size: 13px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.15s;
+    }
+
+    .btn:hover { background: var(--border); }
+    .btn-primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+    .btn-primary:hover { background: #4c9aed; }
+
+    select.btn {
+      appearance: none;
+      padding-right: 28px;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='%238b949e'%3E%3Cpath d='M6 8L2 4h8z'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 8px center;
+    }
+
+    /* Main */
+    .main {
+      flex: 1;
+      display: grid;
+      grid-template-columns: 380px 1fr;
+      overflow: hidden;
+    }
+
+    .sidebar {
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .sidebar-header {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 12px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--text-secondary);
+    }
+
+    .sidebar-actions {
+      display: flex;
+      gap: 12px;
+    }
+
+    .sidebar-actions span {
+      cursor: pointer;
+      color: var(--text-muted);
+      transition: color 0.15s;
+    }
+
+    .sidebar-actions span:hover { color: var(--accent); }
+
+    .tree-container {
+      flex: 1;
+      overflow: auto;
+      padding: 8px 0;
+    }
+
+    /* Tree */
+    .tree-node {
+      user-select: none;
+    }
+
+    .tree-row {
+      display: flex;
+      align-items: center;
+      padding: 4px 12px 4px 0;
+      cursor: pointer;
+      transition: background 0.1s;
+      border-radius: 0;
+    }
+
+    .tree-row:hover { background: var(--bg-hover); }
+    .tree-row.selected { background: var(--bg-selected); }
+
+    .tree-indent {
+      display: flex;
+      align-items: center;
+    }
+
+    .tree-guide {
+      width: 20px;
+      height: 100%;
+      position: relative;
+    }
+
+    .tree-toggle {
+      width: 20px;
+      height: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--text-muted);
+      font-size: 10px;
+      flex-shrink: 0;
+    }
+
+    .tree-toggle:hover { color: var(--text); }
+
+    .tree-checkbox {
+      width: 16px;
+      height: 16px;
+      margin-right: 8px;
+      accent-color: var(--accent);
+      flex-shrink: 0;
+    }
+
+    .tree-icon {
+      width: 18px;
+      height: 18px;
+      border-radius: 4px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-right: 8px;
+      font-size: 10px;
+      font-weight: 600;
+      flex-shrink: 0;
+    }
+
+    .tree-icon.obj { background: #fef3c7; color: var(--accent-orange); }
+    .tree-icon.arr { background: #ede9fe; color: var(--accent-purple); }
+
+    .tree-key {
+      font-weight: 500;
+      color: var(--text);
+      margin-right: 6px;
+    }
+
+    .tree-type {
+      color: var(--text-muted);
+      font-size: 12px;
+      margin-right: 8px;
+    }
+
+    .tree-value {
+      color: var(--accent-green);
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 12px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      max-width: 140px;
+    }
+
+    .tree-value.str { color: var(--accent-green); }
+    .tree-value.num { color: var(--accent-purple); }
+    .tree-value.bool { color: var(--accent-orange); }
+    .tree-value.null { color: var(--text-muted); }
+
+    /* Output */
+    .output {
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .output-header {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .output-title {
+      font-size: 12px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--text-secondary);
+    }
+
+    .output-badge {
+      font-size: 11px;
+      padding: 2px 8px;
+      border-radius: 10px;
+      background: var(--bg-hover);
+      color: var(--text-muted);
+    }
+
+    .output-content {
+      flex: 1;
+      overflow: auto;
+      padding: 16px;
+    }
+
+    .output-content pre {
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 13px;
+      line-height: 1.5;
+      color: var(--text);
+      white-space: pre-wrap;
+      word-break: break-all;
+    }
+
+    .output-content pre.error {
+      color: var(--accent-red);
+    }
+
+    /* Footer */
+    .footer {
+      padding: 12px 16px;
+      background: var(--bg-card);
+      border-top: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .jq-label {
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--accent);
+    }
+
+    .jq-input {
+      flex: 1;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 8px 12px;
+      border-radius: 6px;
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 13px;
+    }
+
+    .jq-input:focus {
+      outline: none;
+      border-color: var(--accent);
+    }
+
+    /* Scrollbar */
+    ::-webkit-scrollbar { width: 8px; height: 8px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+  </style>
+</head>
+<body>
+  <div id="app" class="app">
+    <div class="header">
+      <div class="brand">
+        <div class="brand-icon">jq</div>
+        <span>jq-view</span>
+      </div>
+      <div class="actions">
+        <select class="btn" v-model="format">
+          <option value="json">JSON</option>
+          <option value="table">Table</option>
+        </select>
+        <button class="btn" @click="copyResult">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+          Copy
+        </button>
+      </div>
+    </div>
+
+    <div class="main">
+      <div class="sidebar">
+        <div class="sidebar-header">
+          <span>Fields</span>
+          <div class="sidebar-actions">
+            <span @click="expandAll">Expand</span>
+            <span @click="collapseAll">Collapse</span>
+          </div>
+        </div>
+        <div class="tree-container">
+          <tree-node
+            v-if="tree"
+            :node="tree"
+            :depth="0"
+            @toggle="toggleNode"
+            @select="selectNode"
+          />
+        </div>
+      </div>
+
+      <div class="output">
+        <div class="output-header">
+          <span class="output-title">Output</span>
+          <span class="output-badge">{{ format.toUpperCase() }}</span>
+        </div>
+        <div class="output-content">
+          <pre :class="{ error: !!error }">{{ error || result }}</pre>
+        </div>
+      </div>
+    </div>
+
+    <div class="footer">
+      <span class="jq-label">jq</span>
+      <input
+        class="jq-input"
+        v-model="expression"
+        @keyup.enter="runQuery"
+        placeholder="Enter jq expression..."
+      >
+      <button class="btn btn-primary" @click="runQuery">Run</button>
+    </div>
+  </div>
+
+  <script>
+    const { createApp, ref, watch, onMounted } = Vue;
+
+    const TreeNode = {
+      name: 'TreeNode',
+      props: ['node', 'depth'],
+      emits: ['toggle', 'select'],
+      template: `
+        <div class="tree-node">
+          <div
+            class="tree-row"
+            :class="{ selected: node.selected }"
+            :style="{ paddingLeft: depth * 20 + 12 + 'px' }"
+            @click="handleClick"
+          >
+            <span class="tree-toggle" @click.stop="$emit('toggle', node)">
+              <template v-if="node.children && node.children.length">
+                {{ node.expanded ? '▼' : '▶' }}
+              </template>
+            </span>
+
+            <input
+              v-if="node.isLeaf"
+              type="checkbox"
+              class="tree-checkbox"
+              :checked="node.selected"
+              @click.stop="$emit('select', node)"
+            >
+            <span v-else class="tree-icon" :class="node.isArray ? 'arr' : 'obj'">
+              {{ node.isArray ? '[ ]' : '{ }' }}
+            </span>
+
+            <span class="tree-key">{{ node.key }}</span>
+
+            <span v-if="!node.isLeaf" class="tree-type">
+              {{ node.isArray ? node.arrayLength + ' items' : (node.key === '[*]' ? 'all items' : Object.keys(node.value).length + ' keys') }}
+            </span>
+
+            <span v-if="node.isLeaf" class="tree-value" :class="node.valueType">
+              {{ node.displayValue }}
+            </span>
+          </div>
+
+          <template v-if="node.expanded && node.children">
+            <tree-node
+              v-for="child in node.children"
+              :key="child.path"
+              :node="child"
+              :depth="depth + 1"
+              @toggle="$emit('toggle', $event)"
+              @select="$emit('select', $event)"
+            />
+          </template>
+        </div>
+      `,
+      methods: {
+        handleClick() {
+          if (this.node.isLeaf) {
+            this.$emit('select', this.node);
+          } else {
+            this.$emit('toggle', this.node);
+          }
+        }
+      }
+    };
+
+    createApp({
+      components: { TreeNode },
+      setup() {
+        const rawData = ref({{INITIAL_DATA}});
+        const tree = ref(null);
+        const result = ref('');
+        const error = ref('');
+        const format = ref('json');
+        const expression = ref('.');
+
+        function buildTree(data, key = 'root', path = '.', isArrayItem = false) {
+          const node = {
+            key,
+            path,
+            value: data,
+            expanded: path === '.',
+            selected: false,
+            isLeaf: false,
+            isArray: false,
+            isArrayItem,
+            arrayLength: 0,
+            children: null,
+            displayValue: '',
+            valueType: ''
+          };
+
+          if (Array.isArray(data)) {
+            node.isArray = true;
+            node.arrayLength = data.length;
+            // Only show first element as template, with [] path for iteration
+            if (data.length > 0 && typeof data[0] === 'object') {
+              const templatePath = path + '[]';
+              node.children = [buildTree(data[0], `[*]`, templatePath, true)];
+            }
+          } else if (data && typeof data === 'object') {
+            node.children = Object.entries(data).map(([k, v]) =>
+              buildTree(v, k, path === '.' ? `.${k}` : `${path}.${k}`, isArrayItem)
+            );
+          } else {
+            node.isLeaf = true;
+            node.displayValue = formatValue(data);
+            node.valueType = getValueType(data);
+          }
+
+          return node;
+        }
+
+        function formatValue(v) {
+          if (v === null) return 'null';
+          if (typeof v === 'string') return v.length > 30 ? `"${v.slice(0, 30)}…"` : `"${v}"`;
+          if (typeof v === 'boolean') return v ? 'true' : 'false';
+          return String(v);
+        }
+
+        function getValueType(v) {
+          if (v === null) return 'null';
+          if (typeof v === 'string') return 'str';
+          if (typeof v === 'number') return 'num';
+          if (typeof v === 'boolean') return 'bool';
+          return '';
+        }
+
+        function toggleNode(node) {
+          node.expanded = !node.expanded;
+        }
+
+        function selectNode(node) {
+          node.selected = !node.selected;
+          updateExpression();
+        }
+
+        function collectSelected(node, paths = []) {
+          if (node.selected && node.isLeaf) {
+            paths.push({ path: node.path, key: node.key });
+          }
+          if (node.children) {
+            node.children.forEach(c => collectSelected(c, paths));
+          }
+          return paths;
+        }
+
+        function updateExpression() {
+          const selected = collectSelected(tree.value);
+          if (selected.length === 0) {
+            expression.value = '.';
+            runQuery();
+            return;
+          }
+
+          // Group by array base path
+          const groups = {};
+          selected.forEach(s => {
+            const match = s.path.match(/^(.*\[\])/);
+            const base = match ? match[1] : 'root';
+            if (!groups[base]) groups[base] = [];
+            groups[base].push(s);
+          });
+
+          const groupKeys = Object.keys(groups);
+
+          if (groupKeys.length === 1) {
+            // All fields from same context
+            const base = groupKeys[0];
+            const fields = groups[base];
+
+            if (base === 'root') {
+              // Non-array fields
+              if (fields.length === 1) {
+                expression.value = fields[0].path;
+              } else {
+                const names = fields.map(f => f.key);
+                expression.value = `{${names.join(', ')}}`;
+              }
+            } else {
+              // Array fields
+              const names = [...new Set(fields.map(f => f.key))];
+              if (names.length === 1) {
+                expression.value = `${base}.${names[0]}`;
+              } else {
+                expression.value = `${base} | {${names.join(', ')}}`;
+              }
+            }
+          } else {
+            // Multiple contexts - build compound expression
+            const parts = [];
+            groupKeys.forEach(base => {
+              const fields = groups[base];
+              const names = [...new Set(fields.map(f => f.key))];
+
+              if (base === 'root') {
+                names.forEach(n => {
+                  const f = fields.find(x => x.key === n);
+                  parts.push(f.path);
+                });
+              } else {
+                if (names.length === 1) {
+                  parts.push(`${base}.${names[0]}`);
+                } else {
+                  parts.push(`[${base} | {${names.join(', ')}}]`);
+                }
+              }
+            });
+            expression.value = parts.join(', ');
+          }
+          runQuery();
+        }
+
+        function expandAll() {
+          function expand(node) {
+            if (node.children) {
+              node.expanded = true;
+              node.children.forEach(expand);
+            }
+          }
+          expand(tree.value);
+        }
+
+        function collapseAll() {
+          function collapse(node) {
+            if (node.children) {
+              node.expanded = node.path === '.';
+              node.children.forEach(collapse);
+            }
+          }
+          collapse(tree.value);
+        }
+
+        async function runQuery() {
+          try {
+            const res = await fetch('/api/query', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                data: rawData.value,
+                expression: expression.value,
+                format: format.value
+              })
+            });
+            const data = await res.json();
+            if (data.error) {
+              error.value = data.error;
+              result.value = '';
+            } else {
+              result.value = data.result;
+              error.value = '';
+            }
+          } catch (e) {
+            error.value = e.message;
+          }
+        }
+
+        function copyResult() {
+          navigator.clipboard.writeText(result.value);
+        }
+
+        onMounted(() => {
+          tree.value = buildTree(rawData.value);
+          runQuery();
+        });
+
+        watch(format, runQuery);
+
+        return {
+          tree, result, error, format, expression,
+          toggleNode, selectNode, expandAll, collapseAll,
+          runQuery, copyResult
+        };
+      }
+    }).mount('#app');
+  </script>
+</body>
+</html>
