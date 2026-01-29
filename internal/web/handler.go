@@ -87,42 +87,164 @@ func respondJSON(w http.ResponseWriter, data any) {
 }
 
 func jsonToTable(data []byte) (string, error) {
-	var items []map[string]any
-
-	// Try array first
-	if err := json.Unmarshal(data, &items); err != nil {
-		// Try single object
-		var single map[string]any
-		if err := json.Unmarshal(data, &single); err != nil {
-			return "", fmt.Errorf("cannot convert to table")
-		}
-		items = []map[string]any{single}
-	}
-
-	if len(items) == 0 {
-		return "", fmt.Errorf("empty data")
-	}
-
-	// Get headers from first item
-	var headers []string
-	for k := range items[0] {
-		headers = append(headers, k)
+	var parsed any
+	if err := json.Unmarshal(data, &parsed); err != nil {
+		return "", fmt.Errorf("cannot parse JSON")
 	}
 
 	var buf bytes.Buffer
-	table := tablewriter.NewTable(&buf)
+	renderTables(&buf, "", parsed)
+
+	if buf.Len() == 0 {
+		return "", fmt.Errorf("no tabular data found")
+	}
+
+	return buf.String(), nil
+}
+
+// renderTables recursively renders tables for each level of the data
+func renderTables(buf *bytes.Buffer, title string, data any) {
+	switch v := data.(type) {
+	case []any:
+		// Array of objects -> render as table
+		if len(v) == 0 {
+			return
+		}
+		// Check if first element is an object
+		if obj, ok := v[0].(map[string]any); ok {
+			renderArrayTable(buf, title, v)
+			// Recursively render nested arrays/objects
+			for key := range obj {
+				var nestedArrays []any
+				for _, item := range v {
+					if m, ok := item.(map[string]any); ok {
+						if nested, exists := m[key]; exists {
+							if arr, isArr := nested.([]any); isArr {
+								nestedArrays = append(nestedArrays, arr...)
+							}
+						}
+					}
+				}
+				if len(nestedArrays) > 0 {
+					renderTables(buf, key, nestedArrays)
+				}
+			}
+		} else {
+			// Array of primitives
+			renderPrimitiveArray(buf, title, v)
+		}
+	case map[string]any:
+		// Single object - collect leaf values and nested structures
+		leafs := make(map[string]any)
+		for key, val := range v {
+			switch nested := val.(type) {
+			case []any:
+				renderTables(buf, key, nested)
+			case map[string]any:
+				renderTables(buf, key, nested)
+			default:
+				leafs[key] = val
+			}
+		}
+		// Render leaf values as single-row table
+		if len(leafs) > 0 {
+			renderObjectTable(buf, title, leafs)
+		}
+	}
+}
+
+// renderArrayTable renders an array of objects as a table
+func renderArrayTable(buf *bytes.Buffer, title string, items []any) {
+	if len(items) == 0 {
+		return
+	}
+
+	// Collect all leaf keys (non-object, non-array)
+	firstObj, ok := items[0].(map[string]any)
+	if !ok {
+		return
+	}
+
+	var headers []string
+	for k, v := range firstObj {
+		switch v.(type) {
+		case []any, map[string]any:
+			// Skip nested structures
+		default:
+			headers = append(headers, k)
+		}
+	}
+
+	if len(headers) == 0 {
+		return
+	}
+
+	// Sort headers for consistent order
+	// (keeping insertion order from map iteration)
+
+	if title != "" {
+		buf.WriteString(fmt.Sprintf("\n── %s ──\n", title))
+	}
+
+	table := tablewriter.NewTable(buf)
 	table.Header(toAny(headers)...)
 
 	for _, item := range items {
-		var row []any
-		for _, h := range headers {
-			row = append(row, formatValue(item[h]))
+		if obj, ok := item.(map[string]any); ok {
+			var row []any
+			for _, h := range headers {
+				row = append(row, formatValue(obj[h]))
+			}
+			table.Append(row...)
 		}
-		table.Append(row...)
 	}
 
 	table.Render()
-	return buf.String(), nil
+}
+
+// renderObjectTable renders a single object as a table
+func renderObjectTable(buf *bytes.Buffer, title string, obj map[string]any) {
+	if len(obj) == 0 {
+		return
+	}
+
+	var headers []string
+	var values []any
+	for k, v := range obj {
+		headers = append(headers, k)
+		values = append(values, formatValue(v))
+	}
+
+	if title != "" {
+		buf.WriteString(fmt.Sprintf("\n── %s ──\n", title))
+	}
+
+	table := tablewriter.NewTable(buf)
+	table.Header(toAny(headers)...)
+	table.Append(values...)
+	table.Render()
+}
+
+// renderPrimitiveArray renders an array of primitive values
+func renderPrimitiveArray(buf *bytes.Buffer, title string, items []any) {
+	if len(items) == 0 {
+		return
+	}
+
+	if title == "" {
+		title = "values"
+	}
+
+	buf.WriteString(fmt.Sprintf("\n── %s ──\n", title))
+
+	table := tablewriter.NewTable(buf)
+	table.Header(title)
+
+	for _, item := range items {
+		table.Append(formatValue(item))
+	}
+
+	table.Render()
 }
 
 func toAny(s []string) []any {
