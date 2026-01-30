@@ -9,13 +9,17 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/jq-view/jq-view/internal/jq"
 	"github.com/olekukonko/tablewriter"
 )
 
-//go:embed index.html
-var indexHTML embed.FS
+//go:embed index.html style.css app.js
+var staticFiles embed.FS
+
+// serverStartTime is used for hot reload detection
+var serverStartTime = time.Now().UnixNano()
 
 type QueryRequest struct {
 	Data       json.RawMessage `json:"data"`
@@ -59,9 +63,30 @@ func Handler(initialData []byte, dirPath string) http.Handler {
 		}
 	}
 
+	// Serve static files (CSS, JS)
+	mux.HandleFunc("/style.css", func(w http.ResponseWriter, r *http.Request) {
+		data, err := staticFiles.ReadFile("style.css")
+		if err != nil {
+			http.Error(w, err.Error(), 500)
+			return
+		}
+		w.Header().Set("Content-Type", "text/css; charset=utf-8")
+		w.Write(data)
+	})
+
+	mux.HandleFunc("/app.js", func(w http.ResponseWriter, r *http.Request) {
+		data, err := staticFiles.ReadFile("app.js")
+		if err != nil {
+			http.Error(w, err.Error(), 500)
+			return
+		}
+		w.Header().Set("Content-Type", "application/javascript; charset=utf-8")
+		w.Write(data)
+	})
+
 	// Serve index page
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		html, err := indexHTML.ReadFile("index.html")
+		html, err := staticFiles.ReadFile("index.html")
 		if err != nil {
 			http.Error(w, err.Error(), 500)
 			return
@@ -79,6 +104,23 @@ func Handler(initialData []byte, dirPath string) http.Handler {
 
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		w.Write([]byte(output))
+	})
+
+	// API: hot reload via Server-Sent Events
+	mux.HandleFunc("/api/reload", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/event-stream")
+		w.Header().Set("Cache-Control", "no-cache")
+		w.Header().Set("Connection", "keep-alive")
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+
+		// Send server start time as ID
+		fmt.Fprintf(w, "data: %d\n\n", serverStartTime)
+		if f, ok := w.(http.Flusher); ok {
+			f.Flush()
+		}
+
+		// Keep connection open until client disconnects
+		<-r.Context().Done()
 	})
 
 	// API: list files in directory

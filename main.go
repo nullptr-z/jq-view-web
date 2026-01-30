@@ -16,7 +16,7 @@ import (
 
 func main() {
 	port := flag.Int("p", 8080, "Port to listen on")
-	noBrowser := flag.Bool("no-browser", false, "Don't open browser automatically")
+	openBrowserFlag := flag.Bool("open", false, "Open browser automatically")
 	flag.Parse()
 
 	var data []byte
@@ -62,7 +62,7 @@ func main() {
 			fmt.Fprintln(os.Stderr, "       cat file.json | jq-view")
 			fmt.Fprintln(os.Stderr, "\nOptions:")
 			fmt.Fprintln(os.Stderr, "  -p PORT        Port to listen on (default 8080)")
-			fmt.Fprintln(os.Stderr, "  -no-browser    Don't open browser automatically")
+			fmt.Fprintln(os.Stderr, "  -open          Open browser automatically")
 			os.Exit(1)
 		}
 	}
@@ -89,7 +89,7 @@ func main() {
 	fmt.Println("Press Ctrl+C to stop")
 
 	// Open browser
-	if !*noBrowser {
+	if *openBrowserFlag {
 		go openBrowser(url)
 	}
 
