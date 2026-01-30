@@ -6,6 +6,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/jq-view/jq-view/internal/jq"
@@ -26,9 +28,36 @@ type QueryResponse struct {
 	Error  string `json:"error,omitempty"`
 }
 
+type FileListResponse struct {
+	Files       []string `json:"files"`
+	CurrentFile string   `json:"currentFile"`
+	DirPath     string   `json:"dirPath"`
+}
+
+type LoadFileRequest struct {
+	Filename string `json:"filename"`
+}
+
+type LoadFileResponse struct {
+	Data  json.RawMessage `json:"data,omitempty"`
+	Error string          `json:"error,omitempty"`
+}
+
 // Handler returns the HTTP handler for the web UI
-func Handler(initialData []byte) http.Handler {
+func Handler(initialData []byte, dirPath string) http.Handler {
 	mux := http.NewServeMux()
+
+	currentFile := ""
+	if dirPath != "" {
+		// Find the first JSON file name
+		entries, _ := os.ReadDir(dirPath)
+		for _, e := range entries {
+			if !e.IsDir() && filepath.Ext(e.Name()) == ".json" {
+				currentFile = e.Name()
+				break
+			}
+		}
+	}
 
 	// Serve index page
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
@@ -40,9 +69,85 @@ func Handler(initialData []byte) http.Handler {
 
 		// Replace placeholder with actual data
 		output := strings.Replace(string(html), "{{INITIAL_DATA}}", string(initialData), 1)
+		// Replace directory mode flag
+		dirModeStr := "false"
+		if dirPath != "" {
+			dirModeStr = "true"
+		}
+		output = strings.Replace(output, "{{DIR_MODE}}", dirModeStr, 1)
+		output = strings.Replace(output, "{{CURRENT_FILE}}", currentFile, 1)
 
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		w.Write([]byte(output))
+	})
+
+	// API: list files in directory
+	mux.HandleFunc("/api/files", func(w http.ResponseWriter, r *http.Request) {
+		if dirPath == "" {
+			respondJSON(w, FileListResponse{Files: nil})
+			return
+		}
+
+		entries, err := os.ReadDir(dirPath)
+		if err != nil {
+			respondJSON(w, FileListResponse{Files: nil})
+			return
+		}
+
+		var files []string
+		for _, e := range entries {
+			if !e.IsDir() && filepath.Ext(e.Name()) == ".json" {
+				files = append(files, e.Name())
+			}
+		}
+
+		respondJSON(w, FileListResponse{
+			Files:       files,
+			CurrentFile: currentFile,
+			DirPath:     dirPath,
+		})
+	})
+
+	// API: load a specific file
+	mux.HandleFunc("/api/load", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			http.Error(w, "Method not allowed", 405)
+			return
+		}
+
+		if dirPath == "" {
+			respondJSON(w, LoadFileResponse{Error: "Not in directory mode"})
+			return
+		}
+
+		var req LoadFileRequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			respondJSON(w, LoadFileResponse{Error: err.Error()})
+			return
+		}
+
+		// Security: ensure filename doesn't contain path traversal
+		if strings.Contains(req.Filename, "..") || strings.Contains(req.Filename, "/") {
+			respondJSON(w, LoadFileResponse{Error: "Invalid filename"})
+			return
+		}
+
+		filePath := filepath.Join(dirPath, req.Filename)
+		data, err := os.ReadFile(filePath)
+		if err != nil {
+			respondJSON(w, LoadFileResponse{Error: err.Error()})
+			return
+		}
+
+		// Validate JSON
+		var js json.RawMessage
+		if err := json.Unmarshal(data, &js); err != nil {
+			respondJSON(w, LoadFileResponse{Error: "Invalid JSON: " + err.Error()})
+			return
+		}
+
+		currentFile = req.Filename
+		respondJSON(w, LoadFileResponse{Data: js})
 	})
 
 	// API: execute jq query

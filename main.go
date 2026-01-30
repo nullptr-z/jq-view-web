@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"runtime"
 
 	"github.com/jq-view/jq-view/internal/web"
@@ -20,14 +21,32 @@ func main() {
 
 	var data []byte
 	var err error
+	var dirPath string
 
-	// Read from file or stdin
+	// Read from file, directory, or stdin
 	args := flag.Args()
 	if len(args) > 0 {
-		data, err = os.ReadFile(args[0])
+		info, err := os.Stat(args[0])
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error reading file: %v\n", err)
+			fmt.Fprintf(os.Stderr, "Error accessing path: %v\n", err)
 			os.Exit(1)
+		}
+
+		if info.IsDir() {
+			// Directory mode: load first JSON file
+			dirPath, _ = filepath.Abs(args[0])
+			data, err = loadFirstJSONFromDir(dirPath)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+				os.Exit(1)
+			}
+		} else {
+			// Single file mode
+			data, err = os.ReadFile(args[0])
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "Error reading file: %v\n", err)
+				os.Exit(1)
+			}
 		}
 	} else {
 		// Check if stdin has data
@@ -39,7 +58,7 @@ func main() {
 				os.Exit(1)
 			}
 		} else {
-			fmt.Fprintln(os.Stderr, "Usage: jq-view [file.json]")
+			fmt.Fprintln(os.Stderr, "Usage: jq-view [file.json | directory]")
 			fmt.Fprintln(os.Stderr, "       cat file.json | jq-view")
 			fmt.Fprintln(os.Stderr, "\nOptions:")
 			fmt.Fprintln(os.Stderr, "  -p PORT        Port to listen on (default 8080)")
@@ -64,6 +83,9 @@ func main() {
 	url := fmt.Sprintf("http://localhost:%d", *port)
 
 	fmt.Printf("Starting jq-view at %s\n", url)
+	if dirPath != "" {
+		fmt.Printf("Directory mode: %s\n", dirPath)
+	}
 	fmt.Println("Press Ctrl+C to stop")
 
 	// Open browser
@@ -71,11 +93,37 @@ func main() {
 		go openBrowser(url)
 	}
 
-	handler := web.Handler(data)
+	handler := web.Handler(data, dirPath)
 	if err := http.ListenAndServe(addr, handler); err != nil {
 		fmt.Fprintf(os.Stderr, "Server error: %v\n", err)
 		os.Exit(1)
 	}
+}
+
+func loadFirstJSONFromDir(dir string) ([]byte, error) {
+	files, err := listJSONFiles(dir)
+	if err != nil {
+		return nil, err
+	}
+	if len(files) == 0 {
+		return nil, fmt.Errorf("no JSON files found in directory")
+	}
+	return os.ReadFile(filepath.Join(dir, files[0]))
+}
+
+func listJSONFiles(dir string) ([]string, error) {
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return nil, err
+	}
+
+	var files []string
+	for _, entry := range entries {
+		if !entry.IsDir() && filepath.Ext(entry.Name()) == ".json" {
+			files = append(files, entry.Name())
+		}
+	}
+	return files, nil
 }
 
 func openBrowser(url string) {

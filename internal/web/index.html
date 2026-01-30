@@ -182,6 +182,51 @@
       padding: 8px 0;
     }
 
+    /* File List */
+    .file-list {
+      border-bottom: 1px solid var(--border);
+      max-height: 200px;
+      overflow-y: auto;
+    }
+
+    .file-item {
+      display: flex;
+      align-items: center;
+      padding: 8px 16px;
+      cursor: pointer;
+      transition: all 0.15s;
+      border-left: 3px solid transparent;
+    }
+
+    .file-item:hover {
+      background: var(--bg-hover);
+    }
+
+    .file-item.active {
+      background: var(--bg-active);
+      border-left-color: var(--accent);
+    }
+
+    .file-item-icon {
+      width: 18px;
+      height: 18px;
+      margin-right: 10px;
+      color: var(--orange);
+    }
+
+    .file-item-name {
+      font-size: 13px;
+      color: var(--text-primary);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .file-item.active .file-item-name {
+      color: var(--accent);
+      font-weight: 500;
+    }
+
     /* Tree */
     .tree-node {
       user-select: none;
@@ -462,6 +507,29 @@
 
     <div class="main">
       <div class="sidebar">
+        <!-- File List (only in directory mode) -->
+        <div v-if="dirMode" class="file-list">
+          <div class="sidebar-header">
+            <span>Files</span>
+            <div class="sidebar-actions">
+              <span @click="refreshFileList">Refresh</span>
+            </div>
+          </div>
+          <div
+            v-for="file in fileList"
+            :key="file"
+            class="file-item"
+            :class="{ active: file === currentFile }"
+            @click="loadFile(file)"
+          >
+            <svg class="file-item-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+              <polyline points="14 2 14 8 20 8"/>
+            </svg>
+            <span class="file-item-name">{{ file }}</span>
+          </div>
+        </div>
+
         <div class="sidebar-header">
           <span>Fields</span>
           <div class="sidebar-actions">
@@ -726,6 +794,11 @@
         const dragEnabled = ref(false);
         // Track moved nodes: { fromPath: string, toPath: string, key: string }[]
         const movedNodes = ref([]);
+
+        // Directory mode
+        const dirMode = ref({{DIR_MODE}});
+        const fileList = ref([]);
+        const currentFile = ref('{{CURRENT_FILE}}');
 
         function buildTree(data, key = 'root', path = '.', isArrayItem = false, originalIndex = 0) {
           const node = {
@@ -1232,17 +1305,64 @@
           navigator.clipboard.writeText(result.value);
         }
 
+        // Load file list from server
+        async function fetchFileList() {
+          if (!dirMode.value) return;
+          try {
+            const res = await fetch('/api/files');
+            const data = await res.json();
+            if (data.files) {
+              fileList.value = data.files;
+            }
+          } catch (e) {
+            console.error('Failed to fetch file list:', e);
+          }
+        }
+
+        // Load a specific file
+        async function loadFile(filename) {
+          if (filename === currentFile.value) return;
+          try {
+            const res = await fetch('/api/load', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ filename })
+            });
+            const data = await res.json();
+            if (data.error) {
+              error.value = data.error;
+              return;
+            }
+            // Update state
+            currentFile.value = filename;
+            rawData.value = data.data;
+            movedNodes.value = [];  // Reset moved nodes tracking
+            tree.value = buildTree(rawData.value);
+            expression.value = '.';
+            runQuery();
+          } catch (e) {
+            error.value = e.message;
+          }
+        }
+
+        // Refresh file list (for newly added files)
+        async function refreshFileList() {
+          await fetchFileList();
+        }
+
         onMounted(() => {
           tree.value = buildTree(rawData.value);
           runQuery();
+          fetchFileList();
         });
 
         watch(format, runQuery);
 
         return {
           tree, result, error, format, expression, dragEnabled,
+          dirMode, fileList, currentFile,
           toggleNode, selectNode, handleReorder, handleMoveInto, expandAll, collapseAll,
-          runQuery, copyResult
+          runQuery, copyResult, loadFile, refreshFileList
         };
       }
     }).mount('#app');
