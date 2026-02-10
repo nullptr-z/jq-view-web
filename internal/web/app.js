@@ -214,6 +214,7 @@ function initApp(initialData, dirMode, currentFileName) {
       const expression = ref('.');
       const dragEnabled = ref(false);
       const compressPath = ref(true);  // Path compression enabled by default
+      const keepExpr = ref(true);  // Keep expression when switching files
       // Track moved nodes: { fromPath: string, toPath: string, key: string }[]
       const movedNodes = ref([]);
 
@@ -862,7 +863,9 @@ function initApp(initialData, dirMode, currentFileName) {
           rawData.value = data.data;
           movedNodes.value = [];  // Reset moved nodes tracking
           tree.value = buildTree(rawData.value);
-          expression.value = '.';
+          if (!keepExpr.value) {
+            expression.value = '.';
+          }
           runQuery();
         } catch (e) {
           error.value = e.message;
@@ -904,7 +907,7 @@ function initApp(initialData, dirMode, currentFileName) {
       watch(compressPath, updateExpression);
 
       return {
-        tree, result, error, format, expression, dragEnabled, compressPath,
+        tree, result, error, format, expression, dragEnabled, compressPath, keepExpr,
         dirMode: dirModeRef, fileList, currentFile,
         toggleNode, selectNode, handleReorder, handleMoveInto, expandAll, collapseAll, collapseEmpty,
         runQuery, copyResult, loadFile, refreshFileList

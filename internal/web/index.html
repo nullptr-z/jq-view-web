@@ -35,6 +35,12 @@
           <div class="sidebar-header">
             <span>Files</span>
             <div class="sidebar-actions">
+              <div class="keep-expr-toggle" @click="keepExpr = !keepExpr" title="Keep jq expression when switching files">
+                <span class="toggle-switch-label">Keep</span>
+                <div class="mini-track" :class="{ active: keepExpr }">
+                  <div class="mini-thumb"></div>
+                </div>
+              </div>
               <span @click="refreshFileList">Refresh</span>
             </div>
           </div>
