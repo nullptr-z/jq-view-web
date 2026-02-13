@@ -243,12 +243,17 @@ function initApp(initialData, dirMode, currentFileName) {
         if (Array.isArray(data)) {
           node.isArray = true;
           node.arrayLength = data.length;
-          // Directly show fields from first element (no [*] wrapper)
           if (data.length > 0 && typeof data[0] === 'object') {
+            // Array of objects: show fields from first element
             const templatePath = path + '[]';
             node.children = Object.entries(data[0]).map(([k, v], idx) =>
               buildTree(v, k, `${templatePath}.${k}`, true, idx)
             );
+          } else {
+            // Array of primitives: treat as selectable leaf
+            node.isLeaf = true;
+            node.displayValue = formatValue(data);
+            node.valueType = 'arr';
           }
         } else if (data && typeof data === 'object') {
           node.children = Object.entries(data).map(([k, v], idx) =>
@@ -265,6 +270,11 @@ function initApp(initialData, dirMode, currentFileName) {
 
       function formatValue(v) {
         if (v === null) return 'null';
+        if (Array.isArray(v)) {
+          const items = v.slice(0, 3).map(item => typeof item === 'string' ? `"${item}"` : String(item));
+          const suffix = v.length > 3 ? ', …' : '';
+          return `[${items.join(', ')}${suffix}]`;
+        }
         if (typeof v === 'string') return v.length > 30 ? `"${v.slice(0, 30)}…"` : `"${v}"`;
         if (typeof v === 'boolean') return v ? 'true' : 'false';
         return String(v);
