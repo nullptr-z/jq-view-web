@@ -78,10 +78,12 @@
             :index="0"
             :parent-children="null"
             :drag-enabled="dragEnabled"
+            :sort-state="sortState"
             @toggle="toggleNode"
             @select="selectNode"
             @reorder="handleReorder"
             @move-into="handleMoveInto"
+            @sort="sortByField"
           />
         </div>
       </div>

@@ -2,8 +2,8 @@ const { createApp, ref, watch, onMounted, nextTick } = Vue;
 
 const TreeNode = {
   name: 'TreeNode',
-  props: ['node', 'depth', 'index', 'parentChildren', 'dragEnabled'],
-  emits: ['toggle', 'select', 'reorder', 'move-into'],
+  props: ['node', 'depth', 'index', 'parentChildren', 'dragEnabled', 'sortState'],
+  emits: ['toggle', 'select', 'reorder', 'move-into', 'sort'],
   template: `
     <div class="tree-node">
       <div
@@ -38,6 +38,20 @@ const TreeNode = {
 
         <span class="tree-key">{{ node.key }}</span>
 
+        <span
+          v-if="node.isArrayItem && node.isLeaf"
+          class="sort-btn"
+          :class="{ active: getSortIndex(node.key) >= 0 }"
+          @click.stop="$emit('sort', node)"
+          :title="'Sort by ' + node.key"
+        >
+          <template v-if="getSortIndex(node.key) >= 0">
+            {{ getSortDir(node.key) === 'asc' ? '\u25B2' : '\u25BC' }}
+            <span v-if="sortState.length > 1" class="sort-order">{{ getSortIndex(node.key) + 1 }}</span>
+          </template>
+          <template v-else>\u25B7</template>
+        </span>
+
         <span v-if="!node.isLeaf" class="tree-type">
           {{ node.isArray ? node.arrayLength + ' items' : (node.children ? node.children.length : 0) + ' keys' }}
         </span>
@@ -52,10 +66,12 @@ const TreeNode = {
           :index="idx"
           :parent-children="node.children"
           :drag-enabled="dragEnabled"
+          :sort-state="sortState"
           @toggle="$emit('toggle', $event)"
           @select="$emit('select', $event)"
           @reorder="$emit('reorder', $event)"
           @move-into="$emit('move-into', $event)"
+          @sort="$emit('sort', $event)"
         />
       </template>
     </div>
@@ -69,6 +85,15 @@ const TreeNode = {
     };
   },
   methods: {
+    getSortIndex(key) {
+      if (!this.sortState || !this.sortState.length) return -1;
+      return this.sortState.findIndex(s => s.field === key);
+    },
+    getSortDir(key) {
+      if (!this.sortState) return null;
+      const item = this.sortState.find(s => s.field === key);
+      return item ? item.dir : null;
+    },
     handleClick() {
       if (this.node.isLeaf) {
         this.$emit('select', this.node);
@@ -215,6 +240,8 @@ function initApp(initialData, dirMode, currentFileName) {
       const dragEnabled = ref(false);
       const compressPath = ref(true);  // Path compression enabled by default
       const keepExpr = ref(true);  // Keep expression when switching files
+      // Sort state: array of { field: string, dir: 'asc'|'desc', arrayPath: string }
+      const sortState = ref([]);
       // Track moved nodes: { fromPath: string, toPath: string, key: string }[]
       const movedNodes = ref([]);
 
@@ -745,15 +772,74 @@ function initApp(initialData, dirMode, currentFileName) {
         return finalExpr;
       }
 
+      function buildSortExpr() {
+        // Build the sort expression from sortState
+        const fields = sortState.value;
+        if (!fields.length) return null;
+
+        const allAsc = fields.every(s => s.dir === 'asc');
+        const allDesc = fields.every(s => s.dir === 'desc');
+
+        if (allAsc) {
+          // Simple: sort_by(.a, .b)
+          return `sort_by(${fields.map(s => `.${s.field}`).join(', ')})`;
+        }
+        if (allDesc) {
+          return `sort_by(${fields.map(s => `.${s.field}`).join(', ')}) | reverse`;
+        }
+
+        // Mixed directions: chain stable sorts from last to first
+        // e.g. tier asc, sub_tier desc => sort_by(.sub_tier) | reverse | sort_by(.tier)
+        const parts = [];
+        for (let i = fields.length - 1; i >= 0; i--) {
+          parts.push(`sort_by(.${fields[i].field})`);
+          if (fields[i].dir === 'desc') {
+            parts.push('reverse');
+          }
+        }
+        return parts.join(' | ');
+      }
+
+      function applySortToExpr(expr) {
+        if (!sortState.value.length) return expr;
+
+        const arrayPath = sortState.value[0].arrayPath;
+        const sortExpr = buildSortExpr();
+
+        // No fields selected: output sorted array directly
+        if (expr === '.') {
+          if (arrayPath === '.') {
+            return sortExpr;
+          }
+          return `${arrayPath} | ${sortExpr}`;
+        }
+
+        // Has selected fields
+        if (arrayPath === '.') {
+          if (expr.startsWith('[.[] |')) {
+            return `${expr} | ${sortExpr}`;
+          }
+          return `[${expr}] | ${sortExpr}`;
+        }
+
+        // Nested array
+        const arrayIterPattern = `${arrayPath}[]`;
+        if (expr.includes(arrayIterPattern)) {
+          return `${expr} | ${arrayPath} |= (${sortExpr})`;
+        }
+
+        return expr;
+      }
+
       function updateExpression() {
         const selected = collectSelected(tree.value);
         if (selected.length === 0) {
-          expression.value = '.';
+          expression.value = applySortToExpr('.');
           runQuery();
           return;
         }
 
-        expression.value = buildNestedExpr(selected);
+        expression.value = applySortToExpr(buildNestedExpr(selected));
         runQuery();
       }
 
@@ -810,6 +896,29 @@ function initApp(initialData, dirMode, currentFileName) {
         }
 
         process(tree.value);
+      }
+
+      function sortByField(node) {
+        if (!node.isArrayItem) return;
+        const field = node.key;
+        const arrayMatch = node.path.match(/^(.*)\[\]\..*$/);
+        const arrayPath = arrayMatch ? arrayMatch[1] : '.';
+
+        const idx = sortState.value.findIndex(s => s.field === field);
+        if (idx >= 0) {
+          if (sortState.value[idx].dir === 'asc') {
+            // asc -> desc
+            sortState.value[idx] = { field, dir: 'desc', arrayPath };
+            sortState.value = [...sortState.value];
+          } else {
+            // desc -> remove
+            sortState.value = sortState.value.filter((_, i) => i !== idx);
+          }
+        } else {
+          // append new sort field
+          sortState.value = [...sortState.value, { field, dir: 'asc', arrayPath }];
+        }
+        updateExpression();
       }
 
       async function runQuery() {
@@ -872,6 +981,7 @@ function initApp(initialData, dirMode, currentFileName) {
           currentFile.value = filename;
           rawData.value = data.data;
           movedNodes.value = [];  // Reset moved nodes tracking
+          sortState.value = [];  // Reset sort state
           tree.value = buildTree(rawData.value);
           if (!keepExpr.value) {
             expression.value = '.';
@@ -917,10 +1027,10 @@ function initApp(initialData, dirMode, currentFileName) {
       watch(compressPath, updateExpression);
 
       return {
-        tree, result, error, format, expression, dragEnabled, compressPath, keepExpr,
+        tree, result, error, format, expression, dragEnabled, compressPath, keepExpr, sortState,
         dirMode: dirModeRef, fileList, currentFile,
         toggleNode, selectNode, handleReorder, handleMoveInto, expandAll, collapseAll, collapseEmpty,
-        runQuery, copyResult, loadFile, refreshFileList
+        sortByField, runQuery, copyResult, loadFile, refreshFileList
       };
     }
   }).mount('#app');

@@ -425,6 +425,39 @@ select.btn {
   font-weight: 400;
 }
 
+.sort-btn {
+  font-size: 10px;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 2px 4px;
+  border-radius: 3px;
+  opacity: 0;
+  transition: all 0.15s;
+  user-select: none;
+}
+
+.tree-row:hover .sort-btn,
+.sort-btn.active {
+  opacity: 1;
+}
+
+.sort-btn:hover {
+  color: var(--accent);
+  background: var(--bg-tertiary);
+}
+
+.sort-btn.active {
+  color: var(--accent);
+  text-shadow: 0 0 8px var(--accent-glow);
+}
+
+.sort-order {
+  font-size: 9px;
+  vertical-align: super;
+  margin-left: 1px;
+  color: var(--accent);
+}
+
 .tree-value {
   font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
   font-size: 13px;
