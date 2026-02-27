@@ -1,4 +1,4 @@
-const { createApp, ref, watch, onMounted, nextTick } = Vue;
+const { createApp, ref, computed, watch, onMounted, nextTick } = Vue;
 
 const TreeNode = {
   name: 'TreeNode',
@@ -945,6 +945,36 @@ function initApp(initialData, dirMode, currentFileName) {
         }
       }
 
+      function highlightJSON(str) {
+        if (!str) return '';
+        // HTML escape first
+        str = str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        // Apply syntax highlighting
+        return str.replace(
+          /("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?)/g,
+          function (match) {
+            let cls = 'json-num';
+            if (/^"/.test(match)) {
+              if (/:$/.test(match)) {
+                cls = 'json-key';
+              } else {
+                cls = 'json-str';
+              }
+            } else if (/true|false/.test(match)) {
+              cls = 'json-bool';
+            } else if (/null/.test(match)) {
+              cls = 'json-null';
+            }
+            return '<span class="' + cls + '">' + match + '</span>';
+          }
+        );
+      }
+
+      const highlightedResult = computed(() => {
+        if (format.value !== 'json') return '';
+        return highlightJSON(result.value);
+      });
+
       function copyResult() {
         navigator.clipboard.writeText(result.value);
       }
@@ -1028,6 +1058,7 @@ function initApp(initialData, dirMode, currentFileName) {
 
       return {
         tree, result, error, format, expression, dragEnabled, compressPath, keepExpr, sortState,
+        highlightedResult,
         dirMode: dirModeRef, fileList, currentFile,
         toggleNode, selectNode, handleReorder, handleMoveInto, expandAll, collapseAll, collapseEmpty,
         sortByField, runQuery, copyResult, loadFile, refreshFileList

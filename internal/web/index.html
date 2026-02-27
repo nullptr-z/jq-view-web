@@ -102,7 +102,9 @@
           </div>
         </div>
         <div class="output-content">
-          <pre :class="{ error: !!error }">{{ error || result }}</pre>
+          <pre v-if="error" class="error">{{ error }}</pre>
+          <pre v-else-if="format === 'json'" v-html="highlightedResult"></pre>
+          <pre v-else>{{ result }}</pre>
         </div>
       </div>
     </div>
