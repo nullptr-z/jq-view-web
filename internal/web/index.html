@@ -28,64 +28,74 @@
       </div>
     </div>
 
-    <div class="main">
+    <div class="main" :class="{ 'sidebar-collapsed': sidebarCollapsed }">
       <div class="sidebar">
-        <!-- File List (only in directory mode) -->
-        <div v-if="dirMode" class="file-section">
-          <div class="sidebar-header">
-            <span>Files</span>
-            <div class="sidebar-actions">
-              <div class="keep-expr-toggle" @click="keepExpr = !keepExpr" title="Keep jq expression when switching files">
-                <span class="toggle-switch-label">Keep</span>
-                <div class="mini-track" :class="{ active: keepExpr }">
-                  <div class="mini-thumb"></div>
-                </div>
-              </div>
-              <span @click="refreshFileList">Refresh</span>
-            </div>
-          </div>
-          <div class="file-list">
-            <div
-              v-for="file in fileList"
-              :key="file"
-              class="file-item"
-              :class="{ active: file === currentFile }"
-              @click="loadFile(file)"
-            >
-              <svg class="file-item-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-                <polyline points="14 2 14 8 20 8"/>
-              </svg>
-              <span class="file-item-name">{{ file }}</span>
-            </div>
-          </div>
+        <div class="sidebar-collapse-bar">
+          <span
+            class="sidebar-toggle-btn"
+            @click="sidebarCollapsed = !sidebarCollapsed"
+            :title="sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'"
+          >{{ sidebarCollapsed ? '»' : '«' }}</span>
         </div>
 
-        <div class="sidebar-header">
-          <span>Struct</span>
-          <div class="sidebar-actions">
-            <span @click="dragEnabled = !dragEnabled" :class="{ active: dragEnabled }">{{ dragEnabled ? 'Drag On' : 'Drag' }}</span>
-            <span @click="expandAll">Expand</span>
-            <span @click="collapseAll">Collapse</span>
-            <span @click="collapseEmpty">Focus</span>
+        <template v-if="!sidebarCollapsed">
+          <!-- File List (only in directory mode) -->
+          <div v-if="dirMode" class="file-section">
+            <div class="sidebar-header">
+              <span>Files</span>
+              <div class="sidebar-actions">
+                <div class="keep-expr-toggle" @click="keepExpr = !keepExpr" title="Keep jq expression when switching files">
+                  <span class="toggle-switch-label">Keep</span>
+                  <div class="mini-track" :class="{ active: keepExpr }">
+                    <div class="mini-thumb"></div>
+                  </div>
+                </div>
+                <span @click="refreshFileList">Refresh</span>
+              </div>
+            </div>
+            <div class="file-list">
+              <div
+                v-for="file in fileList"
+                :key="file"
+                class="file-item"
+                :class="{ active: file === currentFile }"
+                @click="loadFile(file)"
+              >
+                <svg class="file-item-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                  <polyline points="14 2 14 8 20 8"/>
+                </svg>
+                <span class="file-item-name">{{ file }}</span>
+              </div>
+            </div>
           </div>
-        </div>
-        <div class="tree-container">
-          <tree-node
-            v-if="tree"
-            :node="tree"
-            :depth="0"
-            :index="0"
-            :parent-children="null"
-            :drag-enabled="dragEnabled"
-            :sort-state="sortState"
-            @toggle="toggleNode"
-            @select="selectNode"
-            @reorder="handleReorder"
-            @move-into="handleMoveInto"
-            @sort="sortByField"
-          />
-        </div>
+
+          <div class="sidebar-header">
+            <span>Struct</span>
+            <div class="sidebar-actions">
+              <span @click="dragEnabled = !dragEnabled" :class="{ active: dragEnabled }">{{ dragEnabled ? 'Drag On' : 'Drag' }}</span>
+              <span @click="expandAll">Expand</span>
+              <span @click="collapseAll">Collapse</span>
+              <span @click="collapseEmpty">Focus</span>
+            </div>
+          </div>
+          <div class="tree-container">
+            <tree-node
+              v-if="tree"
+              :node="tree"
+              :depth="0"
+              :index="0"
+              :parent-children="null"
+              :drag-enabled="dragEnabled"
+              :sort-state="sortState"
+              @toggle="toggleNode"
+              @select="selectNode"
+              @reorder="handleReorder"
+              @move-into="handleMoveInto"
+              @sort="sortByField"
+            />
+          </div>
+        </template>
       </div>
 
       <div class="output">
@@ -111,6 +121,16 @@
 
     <div class="footer">
       <span class="jq-label">jq</span>
+      <select
+        v-if="timestampFields.length"
+        class="btn timestamp-select"
+        title="Convert a timestamp field to date"
+        :value="''"
+        @change="applyTimestampConvert($event)"
+      >
+        <option value="" disabled>⏱ Time</option>
+        <option v-for="f in timestampFields" :key="f.path" :value="f.path">{{ f.path }} ({{ f.unit }})</option>
+      </select>
       <input
         class="jq-input"
         v-model="expression"

@@ -240,6 +240,8 @@ function initApp(initialData, dirMode, currentFileName) {
       const dragEnabled = ref(false);
       const compressPath = ref(true);  // Path compression enabled by default
       const keepExpr = ref(true);  // Keep expression when switching files
+      // Sidebar can default to collapsed via ?sidebar=collapsed in the URL.
+      const sidebarCollapsed = ref(new URLSearchParams(location.search).get('sidebar') === 'collapsed');
       // Sort state: array of { field: string, dir: 'asc'|'desc', arrayPath: string }
       const sortState = ref([]);
       // Track moved nodes: { fromPath: string, toPath: string, key: string }[]
@@ -921,6 +923,8 @@ function initApp(initialData, dirMode, currentFileName) {
         updateExpression();
       }
 
+      // runQuery evaluates the current expression against the current data.
+      // Returns true on success, false if jq reported an error.
       async function runQuery() {
         try {
           const res = await fetch('/api/query', {
@@ -936,12 +940,14 @@ function initApp(initialData, dirMode, currentFileName) {
           if (data.error) {
             error.value = data.error;
             result.value = '';
-          } else {
-            result.value = data.result;
-            error.value = '';
+            return false;
           }
+          result.value = data.result;
+          error.value = '';
+          return true;
         } catch (e) {
           error.value = e.message;
+          return false;
         }
       }
 
@@ -974,6 +980,58 @@ function initApp(initialData, dirMode, currentFileName) {
         if (format.value !== 'json') return '';
         return highlightJSON(result.value);
       });
+
+      // Detect whether a numeric leaf value looks like a unix timestamp,
+      // based on digit count: 9-10 digits = seconds, 12-13 digits = milliseconds.
+      function detectTimestampUnit(v) {
+        if (typeof v !== 'number' || !Number.isInteger(v) || v <= 0) return null;
+        const digits = String(Math.trunc(v)).length;
+        if (digits === 9 || digits === 10) return 'sec';
+        if (digits === 12 || digits === 13) return 'ms';
+        return null;
+      }
+
+      // Walk the tree collecting numeric leaf fields that look like timestamps.
+      function collectTimestampFields(node, out = [], seen = new Set()) {
+        if (node.isLeaf && node.valueType === 'num') {
+          const unit = detectTimestampUnit(node.value);
+          if (unit && !seen.has(node.path)) {
+            seen.add(node.path);
+            out.push({ path: node.path, unit });
+          }
+        }
+        if (node.children) {
+          node.children.forEach(c => collectTimestampFields(c, out, seen));
+        }
+        return out;
+      }
+
+      const timestampFields = computed(() => {
+        if (!tree.value) return [];
+        return collectTimestampFields(tree.value);
+      });
+
+      // Default display timezone offset in hours. `todate` alone always
+      // renders UTC, so we add the offset before formatting to get the
+      // actual local wall-clock time (Beijing time, UTC+8).
+      const TZ_OFFSET_HOURS = 8;
+
+      function timestampToDateExpr(unit) {
+        const seconds = unit === 'ms' ? '(./1000)' : '.';
+        return `((${seconds}+${TZ_OFFSET_HOURS}*3600) | strftime("%Y-%m-%d %H:%M:%S"))`;
+      }
+
+      // Quick action: pick a detected timestamp field and auto-fill the jq
+      // expression to convert it to readable Beijing time (UTC+8) in place.
+      function applyTimestampConvert(event) {
+        const path = event.target.value;
+        event.target.value = ''; // reset select back to placeholder
+        if (!path) return;
+        const field = timestampFields.value.find(f => f.path === path);
+        if (!field) return;
+        expression.value = `${path} |= ${timestampToDateExpr(field.unit)}`;
+        runQuery();
+      }
 
       function copyResult() {
         navigator.clipboard.writeText(result.value);
@@ -1027,23 +1085,63 @@ function initApp(initialData, dirMode, currentFileName) {
         await fetchFileList();
       }
 
+      // applyData swaps in a new dataset in place (without a full page reload),
+      // keeping the current jq expression so transforms like `todate` persist
+      // when the same endpoint is re-sent. If the new response has a different
+      // shape, the kept expression may reference a now-missing path and fail
+      // (e.g. gojq's "cannot iterate over: null"); in that case fall back to `.`
+      // so the new data always shows instead of a stale error.
+      async function applyData(newData) {
+        rawData.value = newData;
+        movedNodes.value = [];
+        sortState.value = [];
+        tree.value = buildTree(rawData.value);
+        const ok = await runQuery();
+        if (!ok && expression.value.trim() !== '.') {
+          expression.value = '.';
+          await runQuery();
+        }
+      }
+
+      // fetchCurrent pulls the latest pushed dataset from the server.
+      async function fetchCurrent() {
+        try {
+          const res = await fetch('/api/current');
+          const payload = await res.json();
+          if (payload && payload.data !== undefined) {
+            applyData(payload.data);
+          }
+        } catch (e) {
+          error.value = e.message;
+        }
+      }
+
       onMounted(() => {
         tree.value = buildTree(rawData.value);
         runQuery();
         fetchFileList();
 
-        // Hot reload: connect to SSE and reload on server restart
+        // SSE: reload on server restart, live-refresh on data push.
         let lastServerId = null;
+        let lastRev = null;
         function connectReload() {
           const es = new EventSource('/api/reload');
-          es.onmessage = (e) => {
+          // Server restart -> full reload.
+          es.addEventListener('reload', (e) => {
             const serverId = e.data;
             if (lastServerId !== null && lastServerId !== serverId) {
-              // Server restarted, reload page
               window.location.reload();
             }
             lastServerId = serverId;
-          };
+          });
+          // Data push -> fetch latest and swap in place.
+          es.addEventListener('data', (e) => {
+            const rev = e.data;
+            if (lastRev !== rev) {
+              lastRev = rev;
+              fetchCurrent();
+            }
+          });
           es.onerror = () => {
             es.close();
             // Reconnect after delay
@@ -1058,10 +1156,12 @@ function initApp(initialData, dirMode, currentFileName) {
 
       return {
         tree, result, error, format, expression, dragEnabled, compressPath, keepExpr, sortState,
+        sidebarCollapsed,
         highlightedResult,
         dirMode: dirModeRef, fileList, currentFile,
         toggleNode, selectNode, handleReorder, handleMoveInto, expandAll, collapseAll, collapseEmpty,
-        sortByField, runQuery, copyResult, loadFile, refreshFileList
+        sortByField, runQuery, copyResult, loadFile, refreshFileList,
+        timestampFields, applyTimestampConvert
       };
     }
   }).mount('#app');

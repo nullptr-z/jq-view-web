@@ -115,6 +115,11 @@ select.btn {
   background-position: right 8px center;
 }
 
+.timestamp-select {
+  flex-shrink: 0;
+  max-width: 220px;
+}
+
 /* Main */
 .main {
   flex: 1;
@@ -122,6 +127,11 @@ select.btn {
   grid-template-columns: 420px 1fr;
   grid-template-rows: 1fr;
   overflow: hidden;
+  transition: grid-template-columns 0.15s ease;
+}
+
+.main.sidebar-collapsed {
+  grid-template-columns: 32px 1fr;
 }
 
 .sidebar {
@@ -130,6 +140,34 @@ select.btn {
   flex-direction: column;
   overflow: hidden;
   background: var(--bg-secondary);
+}
+
+.sidebar-collapse-bar {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 48px;
+  border-bottom: 1px solid var(--border);
+}
+
+.main.sidebar-collapsed .sidebar-collapse-bar {
+  border-bottom: none;
+}
+
+.sidebar-toggle-btn {
+  cursor: pointer;
+  color: var(--text-muted);
+  font-weight: 700;
+  font-size: 14px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  user-select: none;
+}
+
+.sidebar-toggle-btn:hover {
+  color: var(--accent);
+  background: var(--bg-hover);
 }
 
 .file-section {
