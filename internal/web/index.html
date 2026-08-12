@@ -120,24 +120,52 @@
     </div>
 
     <div class="footer">
-      <span class="jq-label">jq</span>
-      <select
-        v-if="timestampFields.length"
-        class="btn timestamp-select"
-        title="Convert a timestamp field to date"
-        :value="''"
-        @change="applyTimestampConvert($event)"
+      <div
+        v-if="quickFields.timestamp.length || quickFields.json.length || quickFields.base64.length"
+        class="quick-actions"
       >
-        <option value="" disabled>⏱ Time</option>
-        <option v-for="f in timestampFields" :key="f.path" :value="f.path">{{ f.path }} ({{ f.unit }})</option>
-      </select>
-      <input
-        class="jq-input"
-        v-model="expression"
-        @keyup.enter="runQuery"
-        placeholder="Enter jq expression..."
-      >
-      <button class="btn btn-primary" @click="runQuery">Run</button>
+        <span class="quick-label">Quick</span>
+        <select
+          v-if="quickFields.timestamp.length"
+          class="btn quick-select"
+          title="Convert a timestamp field to Beijing time"
+          :value="''"
+          @change="applyTimestampConvert($event)"
+        >
+          <option value="" disabled>⏱ Time</option>
+          <option v-for="f in quickFields.timestamp" :key="f.path" :value="f.path">{{ f.path }} ({{ f.unit }})</option>
+        </select>
+        <select
+          v-if="quickFields.json.length"
+          class="btn quick-select"
+          title="Expand a nested JSON string in place"
+          :value="''"
+          @change="applyJsonConvert($event)"
+        >
+          <option value="" disabled>{} JSON</option>
+          <option v-for="f in quickFields.json" :key="f.path" :value="f.path">{{ f.path }}</option>
+        </select>
+        <select
+          v-if="quickFields.base64.length"
+          class="btn quick-select"
+          title="Decode a base64 string in place"
+          :value="''"
+          @change="applyBase64Convert($event)"
+        >
+          <option value="" disabled>B64 Base64</option>
+          <option v-for="f in quickFields.base64" :key="f.path" :value="f.path">{{ f.path }}</option>
+        </select>
+      </div>
+      <div class="jq-row">
+        <span class="jq-label">jq</span>
+        <input
+          class="jq-input"
+          v-model="expression"
+          @keyup.enter="runQuery"
+          placeholder="Enter jq expression..."
+        >
+        <button class="btn btn-primary" @click="runQuery">Run</button>
+      </div>
     </div>
   </div>
 

@@ -115,11 +115,6 @@ select.btn {
   background-position: right 8px center;
 }
 
-.timestamp-select {
-  flex-shrink: 0;
-  max-width: 220px;
-}
-
 /* Main */
 .main {
   flex: 1;
@@ -623,6 +618,33 @@ select.btn {
   padding: 12px 16px;
   background: var(--bg-secondary);
   border-top: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.quick-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.quick-label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+  flex-shrink: 0;
+}
+
+.quick-select {
+  flex-shrink: 0;
+  max-width: 240px;
+}
+
+.jq-row {
   display: flex;
   align-items: center;
   gap: 12px;

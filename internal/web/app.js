@@ -981,56 +981,168 @@ function initApp(initialData, dirMode, currentFileName) {
         return highlightJSON(result.value);
       });
 
-      // Detect whether a numeric leaf value looks like a unix timestamp,
-      // based on digit count: 9-10 digits = seconds, 12-13 digits = milliseconds.
-      function detectTimestampUnit(v) {
-        if (typeof v !== 'number' || !Number.isInteger(v) || v <= 0) return null;
-        const digits = String(Math.trunc(v)).length;
-        if (digits === 9 || digits === 10) return 'sec';
-        if (digits === 12 || digits === 13) return 'ms';
+      // ---- Quick actions: scan the data for fields that can be transformed in
+      // place (timestamp -> date, JSON string -> object, base64 -> text), then
+      // offer a per-category dropdown above the jq input. Picking a field builds
+      // a `path |= <transform>` clause. A field may match more than one category
+      // (e.g. a base64 string that also parses as JSON); the dropdowns just list
+      // every candidate, and "last pick wins" is handled at apply time by
+      // replacing any existing clause for that same path.
+
+      // Default display timezone offset in hours. `strftime` renders UTC, so we
+      // add the offset first to get local wall-clock time (Beijing, UTC+8).
+      const TZ_OFFSET_HOURS = 8;
+
+      // Timestamp: numeric or numeric-string, 9-10 digits = seconds, 12-13 = ms.
+      // Returns {unit, isString} so the generated expression can coerce string
+      // values with `tonumber` (jq can't add a string and a number).
+      function detectTimestamp(v) {
+        let n, isString;
+        if (typeof v === 'number') {
+          n = v; isString = false;
+        } else if (typeof v === 'string' && /^\d+$/.test(v)) {
+          n = Number(v); isString = true;
+        } else {
+          return null;
+        }
+        if (!Number.isInteger(n) || n <= 0) return null;
+        const digits = String(n).length;
+        if (digits === 9 || digits === 10) return { unit: 'sec', isString };
+        if (digits === 12 || digits === 13) return { unit: 'ms', isString };
         return null;
       }
 
-      // Walk the tree collecting numeric leaf fields that look like timestamps.
-      function collectTimestampFields(node, out = [], seen = new Set()) {
-        if (node.isLeaf && node.valueType === 'num') {
-          const unit = detectTimestampUnit(node.value);
-          if (unit && !seen.has(node.path)) {
-            seen.add(node.path);
-            out.push({ path: node.path, unit });
+      // Nested JSON: a string whose content parses to an object or array.
+      function isJsonString(v) {
+        if (typeof v !== 'string') return false;
+        const s = v.trim();
+        if (!(s.startsWith('{') || s.startsWith('['))) return false;
+        try {
+          const parsed = JSON.parse(s);
+          return parsed !== null && typeof parsed === 'object';
+        } catch (_) {
+          return false;
+        }
+      }
+
+      // Base64: valid charset, length multiple of 4, decodes to printable text,
+      // and isn't already JSON (JSON gets its own, more specific category).
+      function isBase64String(v) {
+        if (typeof v !== 'string') return false;
+        const s = v.trim();
+        if (s.length < 8 || s.length % 4 !== 0) return false;
+        if (!/^[A-Za-z0-9+/]+={0,2}$/.test(s)) return false;
+        try {
+          const decoded = atob(s);
+          // Reject non-printable / control-heavy decodes (likely binary or noise).
+          return /^[\x09\x0a\x0d\x20-\x7e]+$/.test(decoded);
+        } catch (_) {
+          return false;
+        }
+      }
+
+      // jq expression fragments for each transform (applied as `path |= <expr>`).
+      function timestampToDateExpr(unit, isString) {
+        const num = isString ? '(.|tonumber)' : '.';
+        const seconds = unit === 'ms' ? `(${num}/1000)` : num;
+        return `((${seconds}+${TZ_OFFSET_HOURS}*3600) | strftime("%Y-%m-%d %H:%M:%S"))`;
+      }
+      const JSON_EXPR = 'fromjson';
+      const BASE64_EXPR = '@base64d';
+
+      // Walk the tree once, bucketing leaf fields into transform categories.
+      // Each category is an independent list; a field can appear in several.
+      function collectQuickFields(node, buckets, seen) {
+        if (node.isLeaf) {
+          const key = node.path;
+          const ts = detectTimestamp(node.value);
+          if (ts && !seen.timestamp.has(key)) {
+            seen.timestamp.add(key);
+            buckets.timestamp.push({ path: key, unit: ts.unit, isString: ts.isString });
+          }
+          if (isJsonString(node.value) && !seen.json.has(key)) {
+            seen.json.add(key);
+            buckets.json.push({ path: key });
+          }
+          if (isBase64String(node.value) && !isJsonString(node.value) && !seen.base64.has(key)) {
+            seen.base64.add(key);
+            buckets.base64.push({ path: key });
           }
         }
         if (node.children) {
-          node.children.forEach(c => collectTimestampFields(c, out, seen));
+          node.children.forEach(c => collectQuickFields(c, buckets, seen));
         }
-        return out;
       }
 
-      const timestampFields = computed(() => {
-        if (!tree.value) return [];
-        return collectTimestampFields(tree.value);
+      const quickFields = computed(() => {
+        const buckets = { timestamp: [], json: [], base64: [] };
+        if (!tree.value) return buckets;
+        collectQuickFields(tree.value, buckets, {
+          timestamp: new Set(), json: new Set(), base64: new Set(),
+        });
+        return buckets;
       });
-
-      // Default display timezone offset in hours. `todate` alone always
-      // renders UTC, so we add the offset before formatting to get the
-      // actual local wall-clock time (Beijing time, UTC+8).
-      const TZ_OFFSET_HOURS = 8;
-
-      function timestampToDateExpr(unit) {
-        const seconds = unit === 'ms' ? '(./1000)' : '.';
-        return `((${seconds}+${TZ_OFFSET_HOURS}*3600) | strftime("%Y-%m-%d %H:%M:%S"))`;
+      // Find an existing `<path> |= ( ... )` clause in expr and return its
+      // [start, end) span, or null if none. We can't use a regex for the
+      // parenthesised body because transforms nest parens (e.g. strftime(...)),
+      // so we locate `<path> |=` then scan with a paren-depth counter to find
+      // the matching close paren.
+      function findClauseSpan(expr, path) {
+        const head = new RegExp(`${path.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*\\|=\\s*\\(`);
+        const m = head.exec(expr);
+        if (!m) return null;
+        // Scan from the opening paren to its matching close.
+        let depth = 0;
+        for (let i = m.index + m[0].length - 1; i < expr.length; i++) {
+          const ch = expr[i];
+          if (ch === '(') depth++;
+          else if (ch === ')') {
+            depth--;
+            if (depth === 0) return { start: m.index, end: i + 1 };
+          }
+        }
+        return null; // unbalanced; treat as no match
       }
 
-      // Quick action: pick a detected timestamp field and auto-fill the jq
-      // expression to convert it to readable Beijing time (UTC+8) in place.
+      // Apply a transform to one field. "Last pick wins": if the expression
+      // already contains a `<path> |= ( ... )` clause for the same field,
+      // replace it instead of stacking a second (conflicting) conversion.
+      function applyFieldTransform(path, transformExpr) {
+        const clause = `${path} |= (${transformExpr})`;
+        const base = expression.value.trim();
+
+        const span = findClauseSpan(base, path);
+        if (span) {
+          expression.value = base.slice(0, span.start) + clause + base.slice(span.end);
+        } else if (base === '' || base === '.') {
+          expression.value = clause;
+        } else {
+          // Chain onto the current expression as a further pipeline stage.
+          expression.value = `${base} | ${clause}`;
+        }
+        runQuery();
+      }
+
+      // Dropdown change handlers (one per category).
       function applyTimestampConvert(event) {
         const path = event.target.value;
-        event.target.value = ''; // reset select back to placeholder
+        event.target.value = '';
         if (!path) return;
-        const field = timestampFields.value.find(f => f.path === path);
+        const field = quickFields.value.timestamp.find(f => f.path === path);
         if (!field) return;
-        expression.value = `${path} |= ${timestampToDateExpr(field.unit)}`;
-        runQuery();
+        applyFieldTransform(path, timestampToDateExpr(field.unit, field.isString));
+      }
+      function applyJsonConvert(event) {
+        const path = event.target.value;
+        event.target.value = '';
+        if (!path) return;
+        applyFieldTransform(path, JSON_EXPR);
+      }
+      function applyBase64Convert(event) {
+        const path = event.target.value;
+        event.target.value = '';
+        if (!path) return;
+        applyFieldTransform(path, BASE64_EXPR);
       }
 
       function copyResult() {
@@ -1161,7 +1273,8 @@ function initApp(initialData, dirMode, currentFileName) {
         dirMode: dirModeRef, fileList, currentFile,
         toggleNode, selectNode, handleReorder, handleMoveInto, expandAll, collapseAll, collapseEmpty,
         sortByField, runQuery, copyResult, loadFile, refreshFileList,
-        timestampFields, applyTimestampConvert
+        quickFields,
+        applyTimestampConvert, applyJsonConvert, applyBase64Convert
       };
     }
   }).mount('#app');

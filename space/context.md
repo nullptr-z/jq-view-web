@@ -135,3 +135,35 @@ viewType——扫描永远判定"已关闭",于是这条分支也会触发重新
 无 jq-view 进程,下次 Send 冷启动新二进制。tab.label 判定依据(页面 title=jq-view)已 grep 确认。
 
 **待用户实测确认**:关掉 tab 后再 Send,是否能重新弹出 jq-view;连续 Send 是否只保留一个 tab。
+
+**7. 快捷操作扩展:时间戳 + 嵌套JSON + Base64,一字段一转换(2026-08-11 追加)**
+
+受 ⏱ Time 那个"扫描数据→识别字段→一键生成 jq"模式启发,扩展成三类快捷操作。用户明确两条要求:
+①快捷操作放到 jq 输入框【上面单独一行】;②同一字段同时只支持一种转换,【无优先级,后选覆盖之前】。
+
+三类识别器(`internal/web/app.js`,叶子字段逐个扫,各自独立成桶,一个字段可同时进多个桶):
+- 时间戳 `detectTimestamp`:数字或纯数字字符串,9-10 位=秒、12-13 位=毫秒。返回 `{unit,isString}`,
+  字符串型生成表达式时必须加 `tonumber`(否则 gojq 报 `cannot add: string and number`,已实测)。
+  表达式 `path |= (((<num>/[1000])+8*3600) | strftime("%Y-%m-%d %H:%M:%S"))`,北京时间 UTC+8。
+- 嵌套 JSON `isJsonString`:trim 后以 `{`/`[` 开头且 `JSON.parse` 成对象/数组。表达式 `path |= (fromjson)`。
+- Base64 `isBase64String`:长度≥8 且是 4 的倍数、符合 base64 字符集、`atob` 解出可打印文本;且排除
+  本身是 JSON 的(让它归 JSON 类,不重叠)。表达式 `path |= (@base64d)`。
+
+后选覆盖(核心坑):`applyFieldTransform` 对同一 path 已有的 `<path> |= ( ... )` clause 做整段替换,
+不同 path 则追加成 `| ` pipeline。★坑:clause 的括号体不能用正则 `\([^)]*\)` 匹配——时间戳表达式含
+嵌套括号(`strftime(...)`),正则会在第一个 `)` 断掉,替换后残留 `strftime(...)))` 非法尾巴。改用
+`findClauseSpan`:定位 `<path> |=` 后用【括号深度计数】扫到配平的收尾 `)`,拿到完整 [start,end) 再
+整段替换。已用 node 复现该 bug 并验证修复。
+
+UI:`internal/web/index.html` footer 改成纵向堆叠——上面 `quick-actions` 行(Quick 标签 + 三个
+`quick-select` 下拉,`v-if` 各自按桶是否有字段显示,全空则整行隐藏),下面 `jq-row`(jq 标签+输入+Run)。
+`internal/web/style.css` footer 改 `flex-direction:column`,新增 `.quick-actions/.quick-label/
+.quick-select/.jq-row`,删掉旧的 `.timestamp-select`。setup 导出改为 `quickFields`(含 timestamp/
+json/base64 三桶)+ 三个 apply 方法,删掉旧的 `timestampFields` alias。
+
+验证:纯函数识别器/覆盖逻辑 node 测过;四种时间戳(数字/字符串 × 秒/毫秒)+ JSON + base64 表达式
+用真实 gojq 引擎端到端跑通、输出正确(时间戳→北京时间、JSON→对象、base64→hello world);
+go build/install 通过;已杀旧进程,下次 Send 冷启动新版。
+
+**扩展方式**:加新快捷操作 = 加一个识别器(判定函数 + collect 里加一桶)+ 一个表达式片段常量 + 一个
+apply 方法 + index.html 加一个 `quick-select` 下拉。后选覆盖 `applyFieldTransform` 通用,不用改。
